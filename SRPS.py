@@ -3,7 +3,10 @@ from random import choices
 import pandas as pd
 
 app = Flask(__name__)
-df = pd.read_excel('data.xlsx')
+df = pd.read_excel('data.xlsx', engine='openpyxl')
+
+def save_to_excel():
+    df.to_excel('data.xlsx', index=False, engine='openpyxl')
 
 def checkn(name):  # 唯一
     return name not in df.name.values
@@ -25,6 +28,7 @@ def deliveri():  # 唯一备案号
 
 def groupe(indexv):  # 取消吊销
     df.loc[df.indexv == indexv, 'fg'] = 0
+    save_to_excel()
 
 def avacheck(name, qq, player, picurl):  # 输入合规性检测
     if 'http' not in picurl:
@@ -46,31 +50,39 @@ def checkch(name):  # 是否审核
 
 def groupy(name):  # 审核通过
     if not checkch(name) and checkdel(name) and not checkfg(name):
-        df.loc[df.name == name, ['indexv', 'fg', 'ch']] = [deliveri(), 0, 1]
+        df.loc[df.name == name, ['fg', 'ch']] = [0, 1]
+        save_to_excel()
 
 def groupf(indexv):  # 吊销组织
     df.loc[df.indexv == indexv, 'fg'] = 1
+    save_to_excel()
 
 def chdelc(name):  # 已审核且未删除
     return checkch(name) and checkdel(name)
 
 def showni():  # 输出所有已审核且未删除的组织名称和对应备案号
-    return df.loc[chdelc(df.name), ['name', 'indexv']].apply(lambda x: f"{x['name']}={x['indexv']}", axis=1).tolist()
+    result = df.loc[chdelc(df.name), ['name', 'indexv']].apply(lambda x: f"{x['name']}={x['indexv']}", axis=1).tolist()
+    return result if result else 'nodata'
 
 def setl(slevel, indexv):  # 设置对应备案号组织等级
     df.loc[(chdelc(df.name)) & (df.indexv == indexv), 'level'] = slevel
+    save_to_excel()
 
 def delg(name):  # 删除对应名称组织
     df.loc[(chdelc(df.name)) & (df.name == name), 'del'] = 1
+    save_to_excel()
 
 def searchg(sname):  # 模糊搜索对应组织
-    return df.loc[(chdelc(df.name)) & (df.name.str.contains(sname)), ['name', 'indexv', 'player', 'level', 'fg']].apply(lambda x: f"{x['name']}={x['indexv']}={x['player']}={x['level']}+{x['fg']}", axis=1).tolist()
+    result = df.loc[(chdelc(df.name)) & (df.name.str.contains(sname)), ['name', 'indexv', 'player', 'level', 'fg']].apply(lambda x: f"{x['name']}={x['indexv']}={x['player']}={x['level']}+{x['fg']}", axis=1).tolist()
+    return result if result else 'nodata'
 
 def backy():  # 输出已审核未删除组织，admin only
-    return df.loc[chdelc(df.name), ['name', 'indexv', 'player', 'qq', 'fg', 'level', 'picurl']].apply(lambda x: f"{x['name']}={x['indexv']}={x['player']}={x['qq']}={x['fg']}={x['level']}+{x['picurl']}", axis=1).tolist()
+    result = df.loc[chdelc(df.name), ['name', 'indexv', 'player', 'qq', 'fg', 'level', 'picurl']].apply(lambda x: f"{x['name']}={x['indexv']}={x['player']}={x['qq']}={x['fg']}={x['level']}+{x['picurl']}", axis=1).tolist()
+    return result if result else 'nodata'
 
 def backn():  # 输出未审核组织，admin only
-    return df.loc[~checkch(df.name) & checkdel(df.name), ['name', 'indexv', 'player', 'qq', 'fg', 'level', 'picurl']].apply(lambda x: f"{x['name']}={x['indexv']}={x['player']}={x['qq']}={x['fg']}={x['level']}+{x['picurl']}", axis=1).tolist()
+    result = df.loc[~df['ch'] & df['del'], ['name', 'indexv', 'player', 'qq', 'fg', 'level', 'picurl']].apply(lambda x: f"{x['name']}={x['indexv']}={x['player']}={x['qq']}={x['fg']}={x['level']}+{x['picurl']}", axis=1).tolist()
+    return result if result else 'nodata'
 
 password = '33666789qw'
 
@@ -90,7 +102,9 @@ def receivedata():
     leveln = '2'
     if avacheck(name, qqn, player, picu):
         global df
-        df = pd.concat([df, pd.DataFrame([{'name': name, 'qq': qqn, 'player': player, 'picurl': picu, 'fg': fgn, 'del': deln, 'ch': chn, 'level': leveln}])], ignore_index=True)
+        indexv = deliveri()  # 分配 indexv 号
+        df = pd.concat([df, pd.DataFrame([{'name': name, 'qq': qqn, 'player': player, 'picurl': picu, 'fg': fgn, 'del': deln, 'ch': chn, 'level': leveln, 'indexv': indexv}])], ignore_index=True)
+        save_to_excel()  # 保存数据到 Excel 文件
         return 'Received'
     else:
         return 'ERR'
@@ -109,7 +123,7 @@ def checkdata():  # 操作xlsx admin only
             return backy()
         if getlist == 'N':
             return backn()
-        if cch == '0' and name:
+        if cch == '0':
             groupy(name)
             return 'done'
         if ddel == '1' and name:
